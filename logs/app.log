@@ -1,0 +1,6 @@
+2025-05-17 10:02:44 ERROR [PaymentService] NullPointerException at line 204 order_id=8821
+2025-05-17 10:03:12 WARN  [AuthService] Token validation took 4200ms threshold=500ms
+2025-05-17 10:04:10 CRITICAL [DBPool] Connection pool exhausted — service degraded
+2025-05-17 10:05:00 INFO  [OrderService] Order #9921 processed successfully
+2025-05-17 10:06:00 ERROR [RecursionHandler] StackOverflowError unhandled exception
+2025-05-17 10:07:00 WARN  [CacheService] Redis cache miss rate 89% — performance impact

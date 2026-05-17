@@ -1,0 +1,5 @@
+2025-05-17 09:00:00 AUDIT action=CREATE_USER by=admin target=contractor_xyz role=ADMIN
+2025-05-17 09:15:00 AUDIT action=ACCESS_FILE by=john.doe file=/reports/salary_data.xlsx
+2025-05-17 09:30:00 AUDIT action=MODIFY_FIREWALL by=devops port=22 change=OPENED to=0.0.0.0
+2025-05-17 09:45:00 AUDIT action=DELETE_USER by=admin target=old_employee
+2025-05-17 09:50:00 AUDIT action=EXPORT_DATA by=contractor_xyz records=50000 BULK

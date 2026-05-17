@@ -1,0 +1,4 @@
+2025-05-17 10:10:00 NETWORK src=192.168.1.5 dst=10.0.0.1 port=443 bytes=1200 ALLOWED
+2025-05-17 10:10:01 NETWORK src=45.33.32.156 dst=10.0.0.1 port=22 bytes=0 BLOCKED
+2025-05-17 10:10:05 NETWORK src=198.51.100.0 PORTSCAN 500 ports in 2 seconds BLOCKED
+2025-05-17 10:11:00 NETWORK src=10.0.0.5 dst=external bytes=2.3GB unusual transfer

@@ -1,0 +1,5 @@
+2025-05-17 10:07:15 SYSTEM disk usage=/var/log 94% WARNING threshold=85%
+2025-05-17 10:07:30 SYSTEM service=nginx STOPPED unexpectedly restarting
+2025-05-17 10:08:00 SYSTEM memory usage=91% OOM killer may activate
+2025-05-17 10:08:45 SYSTEM ssl_cert=api.company.com expires_in=3 days WARNING
+2025-05-17 10:09:00 SYSTEM cpu_load=8.2 cores=4 sustained=5min WARNING
