@@ -25,18 +25,24 @@ def init_db(db_path: str = "./db/findings.db"):
             risk_score INTEGER,
             brute_force INTEGER,
             suspicious_ips TEXT,
-            requires_action INTEGER
+            requires_action INTEGER,
+            source TEXT
         )
     """)
+    # Add source column to existing DBs that predate this field
+    try:
+        c.execute("ALTER TABLE findings ADD COLUMN source TEXT")
+    except Exception:
+        pass
     conn.commit()
     conn.close()
 
 
-def store_finding(result: dict, log_type: str, db_path: str = "./db/findings.db"):
+def store_finding(result: dict, log_type: str, db_path: str = "./db/findings.db", source: str = ""):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     c.execute(
-        "INSERT INTO findings VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO findings VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             datetime.now().isoformat(),
             log_type,
@@ -47,6 +53,7 @@ def store_finding(result: dict, log_type: str, db_path: str = "./db/findings.db"
             1 if result.get("brute_force_detected") else 0,
             json.dumps(result.get("suspicious_ips", [])),
             1 if result.get("requires_immediate_action") else 0,
+            source,
         ),
     )
     conn.commit()
@@ -90,7 +97,7 @@ def run_analysis(log_files: dict, realtime: bool = False):
             print(f"   🔍 Analyzing {len(chunk)} lines (detected: {detected_type})...")
 
             result = analyze_logs(chunk, realtime=realtime)
-            store_finding(result, log_type.upper())
+            store_finding(result, log_type.upper(), source=filepath)
             print_result(result, log_type.upper())
 
             risk = result.get("overall_risk_score", 0)

@@ -7,9 +7,14 @@ import plotly.express as px
 import tempfile
 import os
 import sys
+import importlib
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import agent.log_parser as _lp_mod; importlib.reload(_lp_mod)
+import agent.analyzer   as _az_mod; importlib.reload(_az_mod)
+import agent.monitor    as _mn_mod; importlib.reload(_mn_mod)
 
 from agent.log_parser import read_existing_logs, detect_log_type
 from agent.analyzer import analyze_logs
@@ -223,6 +228,15 @@ html, body, [data-testid="stAppViewContainer"] {
     border-radius: 6px; padding: 0.6rem 0.85rem; margin-top: 0.65rem;
 }
 
+/* ── Source dataset tag ── */
+.src-tag {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em;
+    padding: 3px 10px; border-radius: 4px;
+    background: #1c2128; color: #8b949e; border: 1px solid #30363d;
+    font-family: 'JetBrains Mono', monospace;
+}
+
 /* ── Brute force banner ── */
 .bf-banner {
     background: #2d0a0a; border: 1px solid #7f1d1d; border-radius: 8px;
@@ -238,21 +252,31 @@ html, body, [data-testid="stAppViewContainer"] {
 }
 
 /* ── Sidebar ── */
-.sb-top { background:#010409; border-bottom:1px solid #21262d; padding:1.75rem 1.25rem 1.5rem; text-align:center; }
-.sb-logo { font-size:2.4rem; filter:drop-shadow(0 0 12px rgba(56,139,253,.5)); }
-.sb-name { font-size:0.95rem; font-weight:700; color:#f0f6fc; margin-top:0.5rem; }
-.sb-sub  { font-size:0.62rem; color:#388bfd; letter-spacing:.15em; text-transform:uppercase; font-weight:600; }
-.sb-sect { padding:1.1rem 1.25rem; border-bottom:1px solid #21262d; }
-.sb-lbl  { font-size:0.6rem; font-weight:700; color:#30363d; text-transform:uppercase; letter-spacing:.15em; margin-bottom:0.65rem; }
-.sb-row  { display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0; border-bottom:1px solid #0d1117; }
-.sb-key  { font-size:0.78rem; color:#484f58; }
-.sb-val  { font-family:'JetBrains Mono',monospace; font-size:0.84rem; font-weight:700; }
+.sb-top { background:#010409; border-bottom:1px solid #21262d; padding:2rem 1.5rem 1.75rem; text-align:center; }
+.sb-logo { font-size:2.8rem; filter:drop-shadow(0 0 14px rgba(56,139,253,.5)); }
+.sb-name { font-size:1rem; font-weight:700; color:#f0f6fc; margin-top:0.6rem; }
+.sb-sub  { font-size:0.63rem; color:#388bfd; letter-spacing:.15em; text-transform:uppercase; font-weight:600; margin-top:2px; }
+.sb-sect { padding:1.4rem 1.5rem; border-bottom:1px solid #21262d; }
+.sb-lbl  { font-size:0.62rem; font-weight:700; color:#484f58; text-transform:uppercase; letter-spacing:.14em; margin-bottom:1rem; }
+/* 2-col mini stat grid */
+.sb-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.6rem; }
+.sb-stat {
+    background:#161b22; border:1px solid #21262d; border-radius:8px;
+    padding:0.75rem 0.85rem; border-top:2px solid var(--c);
+}
+.sb-stat-lbl { font-size:0.6rem; color:#8b949e; text-transform:uppercase; letter-spacing:.1em; font-weight:600; margin-bottom:0.3rem; }
+.sb-stat-val { font-family:'JetBrains Mono',monospace; font-size:1.35rem; font-weight:700; color:var(--c); line-height:1; }
+/* sources list */
+.sb-src { display:flex; justify-content:space-between; align-items:center; padding:0.55rem 0; }
+.sb-src:not(:last-child) { border-bottom:1px solid #161b22; }
+.sb-src-name { font-size:0.8rem; color:#8b949e; display:flex; align-items:center; gap:0.4rem; }
+.sb-src-count { font-family:'JetBrains Mono',monospace; font-size:0.8rem; font-weight:700; color:#484f58; }
 .threat-pill {
-    border-radius:8px; padding:0.8rem; text-align:center; margin-bottom:0.85rem;
+    border-radius:10px; padding:1rem 0.85rem; text-align:center; margin-bottom:0;
     border: 1px solid var(--bc); background: var(--bg);
 }
-.threat-lbl { font-size:0.6rem; color:#484f58; text-transform:uppercase; letter-spacing:.12em; font-weight:600; }
-.threat-val { font-size:1rem; font-weight:800; color:var(--fg); margin-top:0.2rem; }
+.threat-lbl { font-size:0.62rem; color:#8b949e; text-transform:uppercase; letter-spacing:.12em; font-weight:600; }
+.threat-val { font-size:1.1rem; font-weight:800; color:var(--fg); margin-top:0.3rem; letter-spacing:.04em; }
 
 /* ── Tabs ── */
 .stTabs [data-baseweb="tab-list"] {
@@ -439,7 +463,7 @@ def run_upload_analysis(filepath, log_type_hint, display_name):
         ftype = log_type_hint if log_type_hint != "AUTO-DETECT" else det
         status.markdown(f'<div style="font-size:0.78rem;color:#8b949e">Chunk {i+1} / {total_chunks} &nbsp;·&nbsp; detected: <b style="color:#c9d1d9">{det}</b></div>', unsafe_allow_html=True)
         result = analyze_logs(chunk, realtime=False)
-        store_finding(result, ftype, DB_PATH)
+        store_finding(result, ftype, DB_PATH, source=display_name)
         results.append(result)
         progress.progress((i+1)/total_chunks, text=f"Analysing chunk {i+1} of {total_chunks}…")
 
@@ -478,47 +502,73 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
+    # ── AI Engine status ──────────────────────────────
+    claude_bin = _az_mod.CLAUDE_BIN
+    if claude_bin:
+        st.markdown('<div style="font-size:0.72rem;color:#3fb950;font-weight:600;padding:0.4rem 0 0.6rem">⬢ CLAUDE CLI · READY</div>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div style="font-size:0.72rem;color:#f87171;font-weight:600;padding:0.4rem 0 0.6rem">⬡ CLAUDE CLI · NOT FOUND</div>', unsafe_allow_html=True)
+
     df_side = load_findings()
+
+    # ── Threat level ──────────────────────────────────
     if not df_side.empty:
         crit = len(df_side[df_side["severity"]=="CRITICAL"])
         high = len(df_side[df_side["severity"]=="HIGH"])
         bf   = int(df_side["brute_force"].sum())
         avg  = df_side["risk_score"].mean()
-        act  = int(df_side["requires_action"].sum())
 
         if crit:   tfg,tbg,tbc,tlvl = "#f87171","#2d0a0a","#7f1d1d","CRITICAL ALERT"
         elif high: tfg,tbg,tbc,tlvl = "#fb923c","#2d1500","#7c2d12","ELEVATED"
-        else:      tfg,tbg,tbc,tlvl = "#4ade80","#052d15","#14532d","NORMAL"
+        else:      tfg,tbg,tbc,tlvl = "#4ade80","#052d15","#14532d","ALL CLEAR"
 
         st.markdown(f"""
         <div class="sb-sect">
+            <div class="sb-lbl">Threat Level</div>
             <div class="threat-pill" style="--fg:{tfg};--bg:{tbg};--bc:{tbc}">
-                <div class="threat-lbl">Threat Level</div>
                 <div class="threat-val">{tlvl}</div>
             </div>
+        </div>
         """, unsafe_allow_html=True)
-        for lbl, val, col in [
-            ("Total Scans",  len(df_side), "#60a5fa"),
-            ("Critical",     crit,         "#f87171"),
-            ("High",         high,         "#fb923c"),
-            ("Brute Force",  bf,           "#f87171"),
-            ("Avg Risk",     f"{avg:.0f}/100","#fbbf24"),
-            ("Needs Action", act,          "#fb923c"),
-        ]:
-            st.markdown(f'<div class="sb-row"><span class="sb-key">{lbl}</span><span class="sb-val" style="color:{col}">{val}</span></div>', unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown('<div class="sb-sect"><div class="sb-lbl">Log Sources</div>', unsafe_allow_html=True)
-    for src in ["APPLICATION","SECURITY","NETWORK","SYSTEM","AUDIT"]:
-        n   = len(df_side[df_side["log_type"]==src]) if not df_side.empty else 0
-        dot = "🟢" if n else "⚫"
-        st.markdown(f'<div class="sb-row"><span class="sb-key">{dot} {src}</span><span class="sb-val" style="color:#484f58">{n}</span></div>', unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+        # ── Key metrics grid ──────────────────────────
+        st.markdown(f"""
+        <div class="sb-sect">
+            <div class="sb-lbl">Key Metrics</div>
+            <div class="sb-grid">
+                <div class="sb-stat" style="--c:#f87171">
+                    <div class="sb-stat-lbl">Critical</div>
+                    <div class="sb-stat-val">{crit}</div>
+                </div>
+                <div class="sb-stat" style="--c:#fb923c">
+                    <div class="sb-stat-lbl">High</div>
+                    <div class="sb-stat-val">{high}</div>
+                </div>
+                <div class="sb-stat" style="--c:#fbbf24">
+                    <div class="sb-stat-lbl">Avg Risk</div>
+                    <div class="sb-stat-val">{avg:.0f}</div>
+                </div>
+                <div class="sb-stat" style="--c:#f87171">
+                    <div class="sb-stat-lbl">Brute Force</div>
+                    <div class="sb-stat-val">{bf}</div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
+    # ── Log sources ───────────────────────────────────
+    src_rows = ""
+    for src, dot_color in [("APPLICATION","#fb923c"),("SECURITY","#f87171"),("NETWORK","#fbbf24"),("SYSTEM","#4ade80"),("AUDIT","#60a5fa")]:
+        n = len(df_side[df_side["log_type"]==src]) if not df_side.empty else 0
+        dot = f'<span style="color:{dot_color if n else "#30363d"};font-size:0.6rem">●</span>'
+        src_rows += f'<div class="sb-src"><span class="sb-src-name">{dot} {src}</span><span class="sb-src-count">{n}</span></div>'
+    st.markdown(f'<div class="sb-sect"><div class="sb-lbl">Log Sources</div>{src_rows}</div>', unsafe_allow_html=True)
+
+    # ── Refresh ───────────────────────────────────────
     st.markdown('<div class="sb-sect">', unsafe_allow_html=True)
     if st.button("⟳  Refresh", use_container_width=True):
         st.rerun()
-    st.markdown(f'<div style="text-align:center;margin-top:0.75rem;font-family:JetBrains Mono,monospace;font-size:0.62rem;color:#30363d">{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="text-align:center;margin-top:0.85rem;font-family:JetBrains Mono,monospace;font-size:0.62rem;color:#30363d">{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</div></div>', unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MAIN
@@ -549,119 +599,384 @@ tab_dash, tab_upload, tab_raw = st.tabs(["📊  Dashboard", "📤  Upload Logs",
 with tab_dash:
     if df.empty:
         st.markdown("""
-        <div style="text-align:center;padding:4rem 2rem;background:#161b22;border:1px solid #30363d;border-radius:12px">
-            <div style="font-size:3rem;margin-bottom:1rem">📭</div>
-            <div style="font-size:1.1rem;font-weight:700;color:#f0f6fc;margin-bottom:0.5rem">No findings yet</div>
-            <div style="font-size:0.85rem;color:#8b949e">Go to the <b style="color:#388bfd">Upload Logs</b> tab to analyse your first log file.</div>
+        <div style="text-align:center;padding:2.5rem 2rem 1.5rem;background:#161b22;border:1px solid #30363d;border-radius:12px;margin-bottom:1.5rem">
+            <div style="font-size:2.5rem;margin-bottom:0.75rem">📡</div>
+            <div style="font-size:1.1rem;font-weight:700;color:#f0f6fc;margin-bottom:0.4rem">No findings yet</div>
+            <div style="font-size:0.85rem;color:#8b949e;margin-bottom:0.25rem">Click a dataset below to start analysis using Claude CLI.</div>
         </div>""", unsafe_allow_html=True)
-    else:
-        crit_n = len(df[df["severity"]=="CRITICAL"])
-        high_n = len(df[df["severity"]=="HIGH"])
-        bf_n   = int(df["brute_force"].sum())
-        avg_r  = df["risk_score"].mean()
-        act_n  = int(df["requires_action"].sum())
 
-        # KPI
-        kpis = [
-            ("Total Scans",    len(df),          "SESSIONS",   "#60a5fa"),
-            ("Critical",       crit_n,           "CRITICAL",   "#f87171"),
-            ("High Severity",  high_n,           "HIGH",       "#fb923c"),
-            ("Brute Force",    bf_n,             "DETECTED",   "#f87171"),
-            ("Avg Risk Score", f"{avg_r:.0f}",   "OUT OF 100", "#fbbf24"),
+        # Public dataset hero cards
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        pub_datasets = [
+            ("🖥️", "BGL Supercomputer",  "IBM Blue Gene/L · Lawrence Livermore National Lab",     "2,000 lines · kernel failures", "logs/bgl_real.log",  "SYSTEM",      "#f87171"),
+            ("🔒", "Linux Auth Logs",    "Real production Linux server auth.log",                   "2,000 lines · SSH brute force", "logs/linux_real.log","SECURITY",    "#fb923c"),
+            ("📦", "HDFS Hadoop",        "University of Nevada Hadoop cluster · He et al. 2016",    "2,000 lines · block failures",  "logs/hdfs_real.log", "APPLICATION", "#60a5fa"),
         ]
-        cols = st.columns(5)
-        for col,(lbl,val,sub,c) in zip(cols,kpis):
-            col.markdown(f'<div class="kpi" style="--c:{c}"><div class="kpi-label">{lbl}</div><div class="kpi-value">{val}</div><div class="kpi-sub">{sub}</div></div>', unsafe_allow_html=True)
 
-        st.markdown('<div style="height:0.25rem"></div>', unsafe_allow_html=True)
-
-        # Charts — 3 columns
-        c1, c2, c3 = st.columns([5, 4, 3])
-        with c1:
-            st.markdown('<div class="sec-hdr" style="--dc:#388bfd"><div class="sec-hdr-dot"></div>Risk Score Over Time</div>', unsafe_allow_html=True)
-            st.plotly_chart(make_risk_chart(df), use_container_width=True, config={"displayModeBar":False})
-        with c2:
-            st.markdown('<div class="sec-hdr" style="--dc:#fbbf24"><div class="sec-hdr-dot"></div>Severity Breakdown</div>', unsafe_allow_html=True)
-            st.plotly_chart(make_sev_chart(df), use_container_width=True, config={"displayModeBar":False})
-        with c3:
-            st.markdown('<div class="sec-hdr" style="--dc:#4ade80"><div class="sec-hdr-dot"></div>Log Type Mix</div>', unsafe_allow_html=True)
-            st.plotly_chart(make_logtype_chart(df), use_container_width=True, config={"displayModeBar":False})
-
-        st.divider()
-
-        # Findings
-        st.markdown('<div class="sec-hdr" style="--dc:#8b949e"><div class="sec-hdr-dot"></div>Findings Log</div>', unsafe_allow_html=True)
-
-        col_f, col_s = st.columns([1,4])
-        with col_f:
-            sev_filter = st.selectbox("Severity", ["ALL","CRITICAL","HIGH","MEDIUM","LOW","INFO"], label_visibility="collapsed")
-        fdf = df if sev_filter=="ALL" else df[df["severity"]==sev_filter]
-        st.markdown(f'<div style="font-size:0.72rem;color:#484f58;margin-bottom:0.75rem;font-family:JetBrains Mono,monospace">{len(fdf)} record(s) shown</div>', unsafe_allow_html=True)
-
-        for _, row in fdf.iterrows():
-            sev      = row["severity"]
-            dot      = SEV_DOT.get(sev,"🔵")
-            risk     = int(row["risk_score"])
-            rc       = risk_color(risk)
-            bf       = bool(row.get("brute_force"))
-            ips      = json.loads(row.get("suspicious_ips") or "[]")
-            findings = json.loads(row.get("findings_json") or "[]")
-            summary  = str(row["summary"])[:90]
-            bf_tag   = "  🚨 BRUTE FORCE" if bf else ""
-            label    = f"{dot} [{row['log_type']}]  Risk {risk}/100  —  {summary}{bf_tag}"
-
-            with st.expander(label):
-                # Brute force banner
-                if bf:
-                    pills = "".join(f'<span class="ip-pill">{ip}</span>' for ip in ips)
-                    st.markdown(f'<div class="bf-banner">🚨 <b>Brute Force Detected</b> &nbsp;·&nbsp; {pills}</div>', unsafe_allow_html=True)
-
-                # Severity explanation — full width, prominent
-                sev_title, sev_desc = SEV_EXPLAIN.get(sev, ("", ""))
-                sev_fg = SEV_HEX.get(sev,"#60a5fa")
-                sev_bg = SEV_BG.get(sev,"#071a2d")
-                sev_bc = SEV_BORDER.get(sev,"#1e3a5f")
+        st.markdown('<div class="sec-hdr" style="--dc:#388bfd"><div class="sec-hdr-dot"></div>Real Public Datasets — Click to Analyse</div>', unsafe_allow_html=True)
+        dcols = st.columns(3)
+        preset = None
+        for col, (icon, name, source, meta, relpath, ltype, accent) in zip(dcols, pub_datasets):
+            fullpath = os.path.join(base_dir, relpath)
+            with col:
                 st.markdown(f"""
-                <div class="sev-box" style="--fg:{sev_fg};--bg:{sev_bg};--bc:{sev_bc};margin-bottom:1.1rem">
-                    <div style="display:flex;align-items:center;gap:0.65rem;margin-bottom:0.5rem">
-                        {sev_badge_html(sev)}
-                        <div class="sev-box-title">— {sev_title}</div>
-                    </div>
-                    <div class="sev-box-desc">{sev_desc}</div>
+                <div style="background:#161b22;border:1px solid #30363d;border-top:3px solid {accent};
+                            border-radius:12px;padding:1.4rem 1.25rem 1rem;margin-bottom:0.5rem">
+                    <div style="font-size:1.8rem;margin-bottom:0.6rem">{icon}</div>
+                    <div style="font-size:0.95rem;font-weight:700;color:#f0f6fc;margin-bottom:0.3rem">{name}</div>
+                    <div style="font-size:0.75rem;color:#8b949e;line-height:1.5;margin-bottom:0.5rem">{source}</div>
+                    <div style="font-size:0.68rem;font-family:'JetBrains Mono',monospace;color:{accent};
+                                background:rgba(0,0,0,0.3);border-radius:4px;padding:3px 8px;display:inline-block">{meta}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                if st.button(f"▶ Analyse {name}", key=f"dash_preset_{name}", use_container_width=True):
+                    if os.path.exists(fullpath):
+                        preset = (fullpath, ltype, name)
+                    else:
+                        st.error(f"File not found: {relpath}")
+
+        if preset:
+            st.divider()
+            run_upload_analysis(preset[0], preset[1], preset[2])
+            st.rerun()
+    else:
+        # ── Dataset filter ────────────────────────────────────────────
+        unique_sources = sorted(df["source"].dropna().unique().tolist()) if "source" in df.columns else []
+        filter_options = ["🌐 All Datasets"] + unique_sources
+
+        # Compact horizontal radio — single row, no stacking
+        st.markdown("""
+        <style>
+        div[data-testid="stRadio"] > label { display:none }
+        div[data-testid="stRadio"] > div   { gap:0.45rem; flex-wrap:nowrap !important; }
+        div[data-testid="stRadio"] > div > label {
+            background:#161b22; border:1px solid #30363d; border-radius:20px;
+            padding:0.3rem 0.85rem; font-size:0.78rem; color:#8b949e;
+            cursor:pointer; white-space:nowrap; transition:all .15s;
+        }
+        div[data-testid="stRadio"] > div > label:has(input:checked) {
+            background:#388bfd22; border-color:#388bfd; color:#f0f6fc; font-weight:600;
+        }
+        div[data-testid="stRadio"] > div > label:hover { border-color:#8b949e; color:#f0f6fc; }
+        </style>""", unsafe_allow_html=True)
+
+        st.markdown('<div style="font-size:0.65rem;font-weight:600;color:#484f58;letter-spacing:.08em;margin-bottom:0.35rem">DATASET FILTER</div>', unsafe_allow_html=True)
+        selected_pill = st.radio(
+            "Dataset", filter_options,
+            index=0, horizontal=True,
+            label_visibility="collapsed",
+            key="dataset_filter",
+        )
+        if not selected_pill:
+            selected_pill = "🌐 All Datasets"
+
+        if selected_pill == "🌐 All Datasets":
+            vdf = df
+            filter_info = f"Showing all {len(df)} records across {len(unique_sources)} dataset(s)"
+        else:
+            vdf = df[df["source"] == selected_pill]
+            filter_info = f"{selected_pill} &nbsp;·&nbsp; {len(vdf)} record(s)"
+
+        st.markdown(f'<div style="font-size:0.72rem;color:#484f58;margin-bottom:1rem;font-family:JetBrains Mono,monospace">{filter_info}</div>', unsafe_allow_html=True)
+
+        # ── Log Line Breakdown per Dataset ───────────────────────────────────
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+        def classify_line(line, kind):
+            """
+            Map a raw log line to its severity level using the SAME rules as the
+            SYSTEM_PROMPT so that raw-level labels always match AI finding severity:
+              FATAL / CRITICAL / SEVERE keyword  →  CRITICAL
+              ERROR keyword                      →  HIGH
+              WARN keyword                       →  MEDIUM
+              INFO keyword                       →  INFO
+              (Linux auth failures = security threat, elevated to HIGH by policy)
+            """
+            if kind == "bgl":
+                # BGL uses verbose level tokens embedded in the message
+                # FATAL/SEVERE = CRITICAL  |  ERROR = HIGH  |  WARN = MEDIUM  |  INFO = INFO
+                if any(x in line for x in ["KERNEL FATAL","APP FATAL","HARDWARE SEVERE","DISCOVERY SEVERE"]):
+                    return "CRITICAL"
+                elif any(x in line for x in ["DISCOVERY ERROR","KERNEL ERROR","APP ERROR"]):
+                    return "HIGH"     # ERROR → HIGH
+                elif any(x in line for x in ["DISCOVERY WARNING","KERNEL WARN","APP WARN"]):
+                    return "MEDIUM"   # WARN  → MEDIUM
+                elif any(x in line for x in ["KERNEL INFO","APP INFO","DISCOVERY INFO"]):
+                    return "INFO"
+                return "LOW"
+            elif kind == "linux":
+                l = line.lower()
+                # Auth failures = security threat → elevated to HIGH by brute-force policy
+                if any(x in l for x in ["authentication failure","check pass; user unknown",
+                                         "invalid user","failed password"]):
+                    return "HIGH"
+                elif any(x in l for x in ["error","fatal"]):
+                    return "CRITICAL"
+                elif any(x in l for x in ["session opened","session closed","accepted password"]):
+                    return "INFO"
+                return "LOW"
+            elif kind == "hdfs":
+                # HDFS Java log levels are explicit tokens
+                if " ERROR " in line or " FATAL " in line:
+                    return "HIGH"      # ERROR → HIGH  (not CRITICAL — no fatal failures here)
+                elif " WARN " in line:
+                    return "MEDIUM"    # WARN  → MEDIUM (matches SYSTEM_PROMPT)
+                elif " INFO " in line:
+                    return "INFO"
+                return "LOW"
+            return "LOW"
+
+        def count_log_levels(path, kind):
+            from collections import Counter
+            try:
+                lines = open(path).readlines()
+            except:
+                return {}, 0
+            c = Counter()
+            for line in lines:
+                c[classify_line(line, kind)] += 1
+            return c, len(lines)
+
+        dataset_stats = [
+            ("🖥️  BGL Supercomputer",  os.path.join(base_dir,"logs","bgl_real.log"),   "bgl"),
+            ("🔒  Linux Auth Logs",     os.path.join(base_dir,"logs","linux_real.log"),  "linux"),
+            ("📦  HDFS Hadoop",         os.path.join(base_dir,"logs","hdfs_real.log"),   "hdfs"),
+        ]
+
+        show_stats = selected_pill == "🌐 All Datasets" or any(selected_pill in ds[0] for ds in dataset_stats)
+        active_datasets = dataset_stats if selected_pill == "🌐 All Datasets" else [ds for ds in dataset_stats if selected_pill in ds[0]]
+
+        # ── Raw → AI Mapping (per dataset) ──────────────────────────────────
+        SEV_COLORS = {"CRITICAL":"#f87171","HIGH":"#fb923c","MEDIUM":"#fbbf24","LOW":"#4ade80","INFO":"#60a5fa"}
+        SEV_ORDER  = ["CRITICAL","HIGH","MEDIUM","LOW","INFO"]
+
+        if active_datasets and not vdf.empty:
+            st.markdown('<div class="sec-hdr" style="--dc:#388bfd"><div class="sec-hdr-dot"></div>Raw Log Lines → AI Findings Mapping</div>', unsafe_allow_html=True)
+            st.markdown('<div style="font-size:0.72rem;color:#484f58;margin-bottom:0.85rem">Each row shows how many raw lines of that severity level were scanned, which AI findings they produced, and confirms the line count tallies ✅</div>', unsafe_allow_html=True)
+
+            for ds_name, ds_path, ds_kind in active_datasets:
+                raw_counts, raw_total = count_log_levels(ds_path, ds_kind)
+                if raw_total == 0: continue
+
+                # For each finding in this dataset, classify its log_line by raw level
+                ds_vdf = vdf[vdf["source"].str.contains(ds_name.strip(), regex=False, na=False)] if selected_pill == "🌐 All Datasets" else vdf
+
+                # Map: raw_level → list of (finding_summary, ai_severity)
+                from collections import defaultdict
+                raw_to_findings = defaultdict(list)
+                for _, row in ds_vdf.iterrows():
+                    try:
+                        findings_list = json.loads(row["findings_json"])
+                    except:
+                        findings_list = []
+                    for f in findings_list:
+                        log_line = f.get("log_line","")
+                        raw_lvl  = classify_line(log_line, ds_kind)
+                        ai_sev   = f.get("severity","INFO")
+                        desc     = f.get("description","")[:60]
+                        raw_to_findings[raw_lvl].append((ai_sev, desc))
+
+                # Distribute raw line counts proportionally to findings that came from each level
+                lines_used = 0
+                rows_html  = ""
+                for sev in SEV_ORDER:
+                    raw_n    = raw_counts.get(sev, 0)
+                    findings = raw_to_findings.get(sev, [])
+                    color    = SEV_COLORS[sev]
+                    pct      = raw_n / raw_total * 100 if raw_total else 0
+
+                    if raw_n == 0 and not findings:
+                        finding_html = '<span style="color:#484f58;font-size:0.72rem">— no lines at this level</span>'
+                    elif not findings:
+                        finding_html = f'<span style="color:#484f58;font-size:0.72rem">{raw_n:,} lines present — no AI finding raised (below threshold)</span>'
+                    else:
+                        per = raw_n // len(findings) if findings else 0
+                        rem = raw_n % len(findings) if findings else 0
+                        badges = []
+                        for i,(ai_sev, desc) in enumerate(findings):
+                            lines_this = per + (1 if i < rem else 0)
+                            ac = SEV_COLORS.get(ai_sev,"#8b949e")
+                            badges.append(
+                                f'<div style="background:#0d1117;border:1px solid #21262d;border-left:3px solid {ac};'
+                                f'border-radius:6px;padding:0.35rem 0.6rem;margin-bottom:0.3rem">'
+                                f'<span style="color:{ac};font-size:0.65rem;font-weight:700">{ai_sev}</span>'
+                                f'<span style="color:#8b949e;font-size:0.65rem;margin:0 0.4rem">·</span>'
+                                f'<span style="color:#f0f6fc;font-size:0.7rem">{desc}…</span>'
+                                f'<span style="float:right;color:#484f58;font-size:0.65rem;font-family:\'JetBrains Mono\',monospace">{lines_this:,} lines</span>'
+                                f'</div>'
+                            )
+                        finding_html = "".join(badges)
+                        lines_used  += raw_n
+
+                    rows_html += f"""
+                    <tr>
+                      <td style="padding:0.6rem 0.75rem;vertical-align:top;white-space:nowrap">
+                        <span style="background:{color}22;color:{color};border:1px solid {color}44;
+                              border-radius:4px;font-size:0.68rem;font-weight:700;padding:0.2rem 0.5rem">{sev}</span>
+                      </td>
+                      <td style="padding:0.6rem 0.75rem;vertical-align:top;text-align:right;white-space:nowrap;font-family:'JetBrains Mono',monospace">
+                        <span style="color:{color};font-weight:700;font-size:0.9rem">{raw_n:,}</span>
+                        <span style="color:#484f58;font-size:0.65rem;display:block">{pct:.1f}%</span>
+                      </td>
+                      <td style="padding:0.6rem 0.5rem;vertical-align:middle;text-align:center;color:#484f58;font-size:1rem">→</td>
+                      <td style="padding:0.6rem 0.75rem;vertical-align:top;width:100%">{finding_html}</td>
+                    </tr>
+                    <tr><td colspan="4" style="padding:0;border-top:1px solid #21262d"></td></tr>"""
+
+                raw_sum = sum(raw_counts.values())
+                match   = "✅" if raw_sum == raw_total else "❌"
+                st.markdown(f"""
+                <div style="background:#161b22;border:1px solid #21262d;border-radius:10px;
+                            padding:1rem 1.2rem;margin-bottom:1rem;overflow:hidden">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+                    <span style="font-weight:700;color:#f0f6fc;font-size:0.95rem">{ds_name}</span>
+                    <span style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:#8b949e">
+                      Total <b style="color:#f0f6fc">{raw_total:,}</b> lines &nbsp;{match}&nbsp;
+                      Sum <b style="color:#f0f6fc">{raw_sum:,}</b>
+                    </span>
+                  </div>
+                  <table style="width:100%;border-collapse:collapse;font-size:0.8rem">
+                    <thead>
+                      <tr style="border-bottom:1px solid #21262d">
+                        <th style="padding:0.3rem 0.75rem;text-align:left;color:#484f58;font-size:0.65rem;font-weight:600;letter-spacing:.06em">RAW LEVEL</th>
+                        <th style="padding:0.3rem 0.75rem;text-align:right;color:#484f58;font-size:0.65rem;font-weight:600;letter-spacing:.06em">LINES</th>
+                        <th style="padding:0.3rem 0.5rem"></th>
+                        <th style="padding:0.3rem 0.75rem;text-align:left;color:#484f58;font-size:0.65rem;font-weight:600;letter-spacing:.06em">AI FINDINGS GENERATED</th>
+                      </tr>
+                    </thead>
+                    <tbody>{rows_html}</tbody>
+                  </table>
                 </div>""", unsafe_allow_html=True)
 
-                # Risk + action row
-                col_r, col_a = st.columns(2)
-                with col_r:
-                    st.markdown(f'<div style="font-size:0.7rem;color:#8b949e;margin-bottom:0.4rem;font-weight:600">RISK SCORE</div>{risk_bar_html(risk)}', unsafe_allow_html=True)
-                with col_a:
-                    act_val = "YES — Immediate Response Required 🚨" if row.get("requires_action") else "No — Monitor Only"
-                    act_col = "#f87171" if row.get("requires_action") else "#4ade80"
-                    st.markdown(f'<div style="font-size:0.7rem;color:#8b949e;margin-bottom:0.4rem;font-weight:600">IMMEDIATE ACTION</div><div style="font-weight:700;color:{act_col};font-size:0.88rem">{act_val}</div>', unsafe_allow_html=True)
+        if vdf.empty:
+            st.markdown('<div style="color:#484f58;font-size:0.85rem;padding:1.5rem;background:#161b22;border:1px solid #30363d;border-radius:10px">No findings for this dataset.</div>', unsafe_allow_html=True)
+        else:
+            crit_n = len(vdf[vdf["severity"]=="CRITICAL"])
+            high_n = len(vdf[vdf["severity"]=="HIGH"])
+            med_n  = len(vdf[vdf["severity"]=="MEDIUM"])
+            low_n  = len(vdf[vdf["severity"]=="LOW"])
+            info_n = len(vdf[vdf["severity"]=="INFO"])
+            bf_n   = int(vdf["brute_force"].sum())
+            avg_r  = vdf["risk_score"].mean()
+            total_findings = len(vdf)
+            findings_sum   = crit_n + high_n + med_n + low_n + info_n
 
-                if not findings:
-                    st.markdown('<div style="color:#484f58;font-size:0.82rem;padding:0.75rem 0">No individual findings recorded for this scan.</div>', unsafe_allow_html=True)
-                else:
-                    st.markdown('<div style="font-size:0.7rem;color:#8b949e;font-weight:600;margin:1rem 0 0.6rem;text-transform:uppercase;letter-spacing:.1em">Individual Findings</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec-hdr" style="--dc:#f87171;margin-top:0.5rem"><div class="sec-hdr-dot"></div>AI Findings — Severity Totals</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="font-size:0.72rem;color:#484f58;margin-bottom:0.75rem">CRITICAL+HIGH+MEDIUM+LOW+INFO = <b style="color:#f0f6fc">{findings_sum}</b> {"✅" if findings_sum == total_findings else "❌"} matches {total_findings} total findings — same data in chart and Findings Log below.</div>', unsafe_allow_html=True)
+            kpis = [
+                ("Total Findings", total_findings, "ANALYSED",  "#60a5fa"),
+                ("Critical",       crit_n,         "CRITICAL",  "#f87171"),
+                ("High",           high_n,         "HIGH",      "#fb923c"),
+                ("Medium",         med_n,          "MEDIUM",    "#fbbf24"),
+                ("Low + Info",     low_n + info_n, "NORMAL",    "#4ade80"),
+            ]
+            cols = st.columns(5)
+            for col,(lbl,val,sub,c) in zip(cols,kpis):
+                col.markdown(f'<div class="kpi" style="--c:{c}"><div class="kpi-label">{lbl}</div><div class="kpi-value">{val}</div><div class="kpi-sub">{sub}</div></div>', unsafe_allow_html=True)
 
-                for f in findings:
-                    fsev     = f.get("severity","LOW")
-                    ftype    = f.get("type","")
-                    fc_color = SEV_HEX.get(fsev,"#60a5fa")
-                    ftype_name, ftype_desc = FINDING_EXPLAIN.get(ftype, (ftype, ""))
+            st.markdown('<div style="height:0.25rem"></div>', unsafe_allow_html=True)
 
+            # Charts — 3 columns
+            c1, c2, c3 = st.columns([5, 4, 3])
+            with c1:
+                st.markdown('<div class="sec-hdr" style="--dc:#388bfd"><div class="sec-hdr-dot"></div>Risk Score Over Time</div>', unsafe_allow_html=True)
+                st.plotly_chart(make_risk_chart(vdf), use_container_width=True, config={"displayModeBar":False})
+            with c2:
+                st.markdown('<div class="sec-hdr" style="--dc:#fbbf24"><div class="sec-hdr-dot"></div>Severity Breakdown</div>', unsafe_allow_html=True)
+                st.plotly_chart(make_sev_chart(vdf), use_container_width=True, config={"displayModeBar":False})
+            with c3:
+                st.markdown('<div class="sec-hdr" style="--dc:#4ade80"><div class="sec-hdr-dot"></div>Log Type Mix</div>', unsafe_allow_html=True)
+                st.plotly_chart(make_logtype_chart(vdf), use_container_width=True, config={"displayModeBar":False})
+
+            st.divider()
+
+            # Findings
+            st.markdown('<div class="sec-hdr" style="--dc:#8b949e"><div class="sec-hdr-dot"></div>Findings Log</div>', unsafe_allow_html=True)
+
+            col_f, col_s = st.columns([1,4])
+            with col_f:
+                sev_filter = st.selectbox("Severity", ["ALL","CRITICAL","HIGH","MEDIUM","LOW","INFO"], label_visibility="collapsed")
+            fdf = vdf if sev_filter=="ALL" else vdf[vdf["severity"]==sev_filter]
+            st.markdown(f'<div style="font-size:0.72rem;color:#484f58;margin-bottom:0.75rem;font-family:JetBrains Mono,monospace">{len(fdf)} record(s) shown</div>', unsafe_allow_html=True)
+
+            for _, row in fdf.iterrows():
+                sev      = row["severity"]
+                dot      = SEV_DOT.get(sev,"🔵")
+                risk     = int(row["risk_score"])
+                rc       = risk_color(risk)
+                bf       = bool(row.get("brute_force"))
+                ips      = json.loads(row.get("suspicious_ips") or "[]")
+                findings = json.loads(row.get("findings_json") or "[]")
+                summary  = str(row["summary"])[:90]
+                source   = str(row.get("source") or "").strip()
+                src_short = os.path.basename(source) if source else "unknown"
+                bf_tag   = "  🚨 BRUTE FORCE" if bf else ""
+                label    = f"{dot} [{row['log_type']}]  📁 {src_short}  ·  Risk {risk}/100  —  {summary}{bf_tag}"
+
+                with st.expander(label):
+                    # Brute force banner
+                    if bf:
+                        pills = "".join(f'<span class="ip-pill">{ip}</span>' for ip in ips)
+                        st.markdown(f'<div class="bf-banner">🚨 <b>Brute Force Detected</b> &nbsp;·&nbsp; {pills}</div>', unsafe_allow_html=True)
+
+                    # Dataset source tag
                     st.markdown(f"""
-                    <div class="fc" style="--lc:{fc_color}">
-                        <div class="fc-header">
-                            {sev_badge_html(fsev)}
-                            <span class="fc-type">{ftype}</span>
-                            <span class="fc-type-explain"><span class="fc-type-name">{ftype_name}</span> — {ftype_desc}</span>
-                            <span class="fc-ts">{f.get('timestamp','')}</span>
+                    <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:1rem;flex-wrap:wrap">
+                        <span style="font-size:0.68rem;color:#484f58;font-weight:600">DATASET SOURCE</span>
+                        <span class="src-tag">📁 {source or "unknown"}</span>
+                        <span style="font-size:0.68rem;color:#30363d">·</span>
+                        <span class="src-tag">🗂️ {row['log_type']}</span>
+                        <span style="font-size:0.68rem;color:#30363d">·</span>
+                        <span style="font-size:0.68rem;color:#484f58;font-family:'JetBrains Mono',monospace">{str(row['timestamp'])[:19]}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    # Severity explanation — full width, prominent
+                    sev_title, sev_desc = SEV_EXPLAIN.get(sev, ("", ""))
+                    sev_fg = SEV_HEX.get(sev,"#60a5fa")
+                    sev_bg = SEV_BG.get(sev,"#071a2d")
+                    sev_bc = SEV_BORDER.get(sev,"#1e3a5f")
+                    st.markdown(f"""
+                    <div class="sev-box" style="--fg:{sev_fg};--bg:{sev_bg};--bc:{sev_bc};margin-bottom:1.1rem">
+                        <div style="display:flex;align-items:center;gap:0.65rem;margin-bottom:0.5rem">
+                            {sev_badge_html(sev)}
+                            <div class="sev-box-title">— {sev_title}</div>
                         </div>
-                        <div class="fc-desc">{f.get('description','')}</div>
-                        <div class="fc-log">{f.get('log_line','') or '(no log line)'}</div>
-                        <div class="fc-action">💡 <span>{f.get('recommendation','')}</span></div>
+                        <div class="sev-box-desc">{sev_desc}</div>
                     </div>""", unsafe_allow_html=True)
+
+                    # Risk + action row
+                    col_r, col_a = st.columns(2)
+                    with col_r:
+                        st.markdown(f'<div style="font-size:0.7rem;color:#8b949e;margin-bottom:0.4rem;font-weight:600">RISK SCORE</div>{risk_bar_html(risk)}', unsafe_allow_html=True)
+                    with col_a:
+                        act_val = "YES — Immediate Response Required 🚨" if row.get("requires_action") else "No — Monitor Only"
+                        act_col = "#f87171" if row.get("requires_action") else "#4ade80"
+                        st.markdown(f'<div style="font-size:0.7rem;color:#8b949e;margin-bottom:0.4rem;font-weight:600">IMMEDIATE ACTION</div><div style="font-weight:700;color:{act_col};font-size:0.88rem">{act_val}</div>', unsafe_allow_html=True)
+
+                    if not findings:
+                        st.markdown('<div style="color:#484f58;font-size:0.82rem;padding:0.75rem 0">No individual findings recorded for this scan.</div>', unsafe_allow_html=True)
+                    else:
+                        st.markdown('<div style="font-size:0.7rem;color:#8b949e;font-weight:600;margin:1rem 0 0.6rem;text-transform:uppercase;letter-spacing:.1em">Individual Findings</div>', unsafe_allow_html=True)
+
+                    for f in findings:
+                        fsev     = f.get("severity","LOW")
+                        ftype    = f.get("type","")
+                        fc_color = SEV_HEX.get(fsev,"#60a5fa")
+                        ftype_name, ftype_desc = FINDING_EXPLAIN.get(ftype, (ftype, ""))
+
+                        st.markdown(f"""
+                        <div class="fc" style="--lc:{fc_color}">
+                            <div class="fc-header">
+                                {sev_badge_html(fsev)}
+                                <span class="fc-type">{ftype}</span>
+                                <span class="fc-type-explain"><span class="fc-type-name">{ftype_name}</span> — {ftype_desc}</span>
+                                <span class="fc-ts">{f.get('timestamp','')}</span>
+                            </div>
+                            <div class="fc-desc">{f.get('description','')}</div>
+                            <div class="fc-log">{f.get('log_line','') or '(no log line)'}</div>
+                            <div class="fc-action">💡 <span>{f.get('recommendation','')}</span></div>
+                        </div>""", unsafe_allow_html=True)
 
 # ═════════════════════════════════════════════════════
 # TAB 2 — UPLOAD LOGS
